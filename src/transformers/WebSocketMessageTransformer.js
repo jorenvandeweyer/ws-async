@@ -1,7 +1,6 @@
 const WebSocketMessage = require('../models/WebSocketMessage');
 
 module.exports = (raw, wsc) => {
-    console.log(raw);
     const parsed = JSON.parse(raw);
 
     const message = new WebSocketMessage(wsc);

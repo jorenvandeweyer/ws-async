@@ -4,7 +4,11 @@ const TYPES = {
     'INITIALIZE': 'initialize',
     'DEFAULT': 'default',
     'ASYNC': 'async',
-    'RESPONSE': 'response',
+    'RESPONSE': {
+        'RESOLVED': 'response.resolved',
+        'REJECTED': 'response.rejected',
+        'TIMEDOUT': 'response.timedout',
+    },
     'BROADCAST': 'broadcast',
     'PING': 'ping',
     'PONG': 'pong',
@@ -58,7 +62,7 @@ module.exports = class WebSocketMessage {
 
         this._timeout = setTimeout(() => {
             this._state = WebSocketMessage.STATES.TIMEDOUT;
-            this.destroy();
+            this.reject();
         }, options.timeout * 1000);
     }
 
@@ -87,27 +91,7 @@ module.exports = class WebSocketMessage {
 
         this._wsc._pinged = Date.now();
 
-        if (this.type === TYPES.RESPONSE) {
-            const wsm = this._wsc.findMessage(this.uuid);
-
-            if (this.isTimedout) {
-                wsm.destroy(this.destroy());
-            } else {
-                wsm.resolve(this.resolve());
-            }
-            return this.resolve();
-        } else if (this.type === TYPES.PING) {
-            this._wsc._ping = Date.now() - this.content;
-            this.resolve();
-
-            // this._wsc.send({
-            //     type: TYPES.PONG,
-            //     content: Date.now(),
-            // });
-        } else if (this.type === TYPES.PONG) {
-            this._wsc._ping = Date.now() - this.content;
-            this.resolve();
-        } else if (this.type === TYPES.INITIALIZE) {
+        if (this.type === TYPES.INITIALIZE) {
             if (this._wsc._server) {
                 this._reject({
                     content: 'Server clients can not be initialized',
@@ -117,96 +101,126 @@ module.exports = class WebSocketMessage {
             this._wsc.uuid = this.content;
             console.debug('set uuid on client');
             this.resolve();
+        } else if (this.type === TYPES.RESPONSE.RESOLVED) {
+            const wsm = this._wsc.findMessage(this.uuid);
+            wsm.resolve(this.resolve());
+        } else if (this.type === TYPES.RESPONSE.REJECTED) {
+            const wsm = this._wsc.findMessage(this.uuid);
+            wsm.reject(this.reject());
+        } else if (this.type === TYPES.RESPONSE.TIMEDOUT) {
+            const wsm = this._wsc.findMessage(this.uuid);
+            wsm._state = STATES.TIMEDOUT;
+            wsm.reject(this.reject());
+        } else if (this.type === TYPES.PING) {
+            this._wsc._ping = Date.now() - this.content;
+            console.log('ping is: ', this._wsc._ping);
+            this.resolve();
+
+            this._wsc.send({
+                type: TYPES.PONG,
+                content: Date.now(),
+            });
+        } else if (this.type === TYPES.PONG) {
+            this._wsc._ping = Date.now() - this.content;
+            console.log('ping is: ', this._wsc._ping);
+            this.resolve();
         } else {
             this._wsc.emit('message', this);
         }
     }
 
-    respond(content) {
-        if (!this._outgoing || this.type !== TYPES.ASYNC) {
-            console.log('respond only works on async incomming messages');
-            return;
-        }
-
-        const wsm = new WebSocketMessage(this._wsc, {
-            uuid: this.uuid,
-            type: TYPES.RESPONSE,
-            from: this._wsc.uuid || this.to,
-            to: this.from,
-            outgoing: true,
-            content,
-        });
-
-        this.resolve();
-
-        return wsm.handle();
-    }
-
-    resolve(message) {
+    resolve(content) {
         if (!this.state.isPending) {
-            console.debug('cannot resolve message, not pending anymore');
-            return;
+            return console.log('already resolved');
+        }
+        console.log('resolved', this.uuid);
+
+        this._state = STATES.RESOLVED;
+
+        content = content || this;
+
+        if (content instanceof WebSocketMessage) {
+            content = content.content;
         }
 
-        console.debug('resolving message', this.uuid);
+        if (this._resolve) this._resolve(content);
 
-        this._state = WebSocketMessage.STATES.RESOLVED;
+        if (this.type === TYPES.ASYNC && !this._outgoing) {
+            const wsm = new WebSocketMessage(this._wsc, {
+                uuid: this.uuid,
+                type: TYPES.RESPONSE.RESOLVED,
+                from: this._wsc.uuid || this.to,
+                to: this.from,
+                outgoing: true,
+                content,
+            });
 
-        message = message || this.raw;
-
-        if (this._resolve) this._resolve(message);
-
-        //destorying should be handled better?
-        this.destroy();
-
-        return message;
-    }
-
-    reject(message) {
-        if (!this.state.isPending) {
-            console.debug('cannot reject message, not pending anymore');
-            return;
+            wsm.handle();
         }
-
-        console.debug('rejecting message', this.uuid);
-
-        this._state = STATES.REJECTED;
-
-        message = message || this.raw;
-
-        if (this._reject) this._reject(message);
 
         this.destroy();
 
-        return message;
+        return content;
     }
 
-    destroy(message) {
+    reject(content) {
+        if (!this.state.isPending && !this.state.isTimedout) {
+            return console.log('already resolved/rejected');
+        }
+        console.log('rejected', this.uuid);
+
+        if (this.state.isPending) {
+            this._state = STATES.REJECTED;
+        }
+
+        content = content || this;
+
+        if (content instanceof WebSocketMessage) {
+            content = content.content;
+        }
+
+        if (this._reject) this._reject(content);
+
+        if (this.type === TYPES.ASYNC && !this._outgoing) {
+            const type = this.state.isPending
+                ? TYPES.RESPONSE.REJECTED
+                : TYPES.RESPONSE.TIMEDOUT;
+
+            const wsm = new WebSocketMessage(this._wsc, {
+                uuid: this.uuid,
+                type,
+                from: this._wsc.uuid || this.to,
+                to: this.from,
+                outgoing: true,
+                content,
+            });
+
+            wsm.handle();
+        }
+
+        this.destroy();
+
+        return content;
+    }
+
+    destroy() {
         clearTimeout(this._timeout);
 
-        console.debug('destroying message', this.uuid);
-
-        message = message || this.raw;
-
         if (this.state.isDestroyed) {
-            console.debug('cannot destroy message, already destroyed');
-            return;
-        } else if (this.state.isResolved || this.state.isRejected) {
-            console.debug('destroying message peacefully');
-        } else if (this.state.isTimedout) {
-            console.debug('destroying message because of timeout');
-            if (this._reject) this._reject(message);
-        } else if (this.state.isPending) {
-            console.debug('early destroy??');
-            this._state = STATES.DESTROYED;
-            if (this._reject) this._reject(message);
+            return console.log('already destroyed');
         }
+        console.log('destroying:', this.uuid);
+
+        if (this.state.isPending) {
+            console.log('still pending');
+            return this.reject();
+        }
+
+        console.log('destroyed:', this.uuid);
 
         this._state = STATES.DESTROYED;
 
         this._wsc._messages.delete(this.uuid);
-
-        return message;
     }
 
     get uuid() {

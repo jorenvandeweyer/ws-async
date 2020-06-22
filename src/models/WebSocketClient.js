@@ -87,7 +87,7 @@ module.exports = class WebSocketClient extends EventEmitter {
         clearInterval(this._pingInterval);
 
         this._messages.forEach(message => {
-            message.destroy(false);
+            message.destroy();
         });
 
         return this._socket.terminate();
