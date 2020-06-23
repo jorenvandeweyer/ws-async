@@ -100,6 +100,7 @@ module.exports = class WebSocketClient extends EventEmitter {
     get data() {
         return {
             uuid: this.uuid,
+            ping: this._ping || -1,
         };
     }
 };

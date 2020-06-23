@@ -25,7 +25,6 @@ const STATES = {
 
 const DEFAULT_MESSAGE = {
     type: TYPES.DEFAULT,
-    from: 'server',
     outgoing: true,
     timeout: 15,
     content: 'Hello world',
@@ -35,7 +34,8 @@ module.exports = class WebSocketMessage {
     constructor(wsc, options) {
         options = {
             uuid: uuidv1(),
-            to: wsc.uuid,
+            to: wsc._server ? wsc.uuid : 'server',
+            from: wsc._server ? 'server' : wsc.uuid,
             ...DEFAULT_MESSAGE,
             ...options
 
@@ -103,12 +103,15 @@ module.exports = class WebSocketMessage {
             this.resolve();
         } else if (this.type === TYPES.RESPONSE.RESOLVED) {
             const wsm = this._wsc.findMessage(this.uuid);
+            if (!wsm) return;
             wsm.resolve(this.resolve());
         } else if (this.type === TYPES.RESPONSE.REJECTED) {
             const wsm = this._wsc.findMessage(this.uuid);
+            if (!wsm) return;
             wsm.reject(this.reject());
         } else if (this.type === TYPES.RESPONSE.TIMEDOUT) {
             const wsm = this._wsc.findMessage(this.uuid);
+            if (!wsm) return;
             wsm._state = STATES.TIMEDOUT;
             wsm.reject(this.reject());
         } else if (this.type === TYPES.PING) {
