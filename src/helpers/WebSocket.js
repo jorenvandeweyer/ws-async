@@ -11,7 +11,7 @@ module.exports = class extends WS {
 
     terminate() {
         if (typeof super.terminate !== 'undefined') {
-            this.terminate();
+            super.terminate();
         } else if (typeof super.close !== 'undefined') {
             this.close();
         } else {
