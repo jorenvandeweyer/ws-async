@@ -19,8 +19,28 @@ module.exports = class WebSocketServer extends EventEmitter {
             this._clients.set(wsc.uuid, wsc);
             ws.on('close', () => this._clients.delete(wsc.uuid));
 
-            wsc.on('message', (message) => this.emit('message', message));
+            wsc.on('message', (message) => this._handle(message));
         });
+    }
+
+    _handle(message) {
+        if (message.to === 'server') {
+            return this.emit('message', message);
+        }
+
+        const from = this.find(message.from);
+        const to = this.find(message.to);
+
+        const forward = async () => {
+            const result = await to.send(message.raw);
+            message.resolve(result);
+        };
+
+        if (typeof this.handle === 'function') {
+            this.handle(message, from, to, forward);
+        } else {
+            forward();
+        }
     }
 
     upgrade(req, socket, head, auth) {
