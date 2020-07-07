@@ -95,9 +95,10 @@ module.exports = class WebSocketClient extends EventEmitter {
             message.destroy();
         });
 
-        this._socket.terminate();
-
-        this._socket = null;
+        if (this._socket) {
+            this._socket.terminate();
+            this._socket = null;
+        }
     }
 
     findMessage(uuid) {
