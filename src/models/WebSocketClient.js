@@ -37,6 +37,11 @@ module.exports = class WebSocketClient extends EventEmitter {
         const delay = 120;
 
         this._pingInterval = setInterval(() => {
+            if (!this._socket) {
+                console.log('not pinging, no socket connected');
+                return;
+            }
+
             if (this._pinged === false) {
                 console.log('did not pong :( destroying');
                 this.destroy();
@@ -90,7 +95,9 @@ module.exports = class WebSocketClient extends EventEmitter {
             message.destroy();
         });
 
-        return this._socket.terminate();
+        this._socket.terminate();
+
+        this._socket = null;
     }
 
     findMessage(uuid) {
