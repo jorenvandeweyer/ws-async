@@ -140,7 +140,7 @@ module.exports = class WebSocketMessage {
 
         this._state = STATES.RESOLVED;
 
-        content = content || this;
+        content = content !== undefined ? content : this;
 
         if (content instanceof WebSocketMessage) {
             content = content.content;
