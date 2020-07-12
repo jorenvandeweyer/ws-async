@@ -72,8 +72,6 @@ module.exports = class WebSocketMessage {
             return;
         }
 
-        console.debug('handling message');
-
         this._state = WebSocketMessage.STATES.PENDING;
 
         if (this._outgoing) {
@@ -99,7 +97,6 @@ module.exports = class WebSocketMessage {
                 return;
             }
             this._wsc.uuid = this.content;
-            console.debug('set uuid on client');
             this.resolve();
         } else if (this.type === TYPES.RESPONSE.RESOLVED) {
             const wsm = this._wsc.findMessage(this.uuid);
@@ -116,7 +113,6 @@ module.exports = class WebSocketMessage {
             wsm.reject(this.reject());
         } else if (this.type === TYPES.PING) {
             this._wsc._ping = Date.now() - this.content;
-            console.log('ping is: ', this._wsc._ping);
             this.resolve();
 
             this._wsc.send({
@@ -125,7 +121,6 @@ module.exports = class WebSocketMessage {
             });
         } else if (this.type === TYPES.PONG) {
             this._wsc._ping = Date.now() - this.content;
-            console.log('ping is: ', this._wsc._ping);
             this.resolve();
         } else {
             this._wsc.emit('message', this);
@@ -136,7 +131,6 @@ module.exports = class WebSocketMessage {
         if (!this.state.isPending) {
             return console.log('already resolved');
         }
-        console.log('resolved', this.uuid);
 
         this._state = STATES.RESOLVED;
 
@@ -212,14 +206,11 @@ module.exports = class WebSocketMessage {
         if (this.state.isDestroyed) {
             return console.log('already destroyed');
         }
-        console.log('destroying:', this.uuid);
 
         if (this.state.isPending) {
             console.log('still pending');
             return this.reject();
         }
-
-        console.log('destroyed:', this.uuid);
 
         this._state = STATES.DESTROYED;
 

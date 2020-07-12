@@ -111,6 +111,13 @@ module.exports = class WebSocketClient extends EventEmitter {
             ping: this._ping || -1,
         };
     }
+
+    get readyState() {
+        if (!this._socket) {
+            return 4;
+        }
+        return this._socket.readyState;
+    }
 };
 
 function pingInterval(delay=30, offset=5) {
