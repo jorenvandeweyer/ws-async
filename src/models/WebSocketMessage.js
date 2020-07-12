@@ -58,7 +58,9 @@ module.exports = class WebSocketMessage {
             content: options.content,
         };
 
-        this._wsc._messages.set(this.uuid, this);
+        if (this._outgoing) {
+            this._wsc._messages.set(this.uuid, this);
+        }
 
         this._timeout = setTimeout(() => {
             this._state = WebSocketMessage.STATES.TIMEDOUT;

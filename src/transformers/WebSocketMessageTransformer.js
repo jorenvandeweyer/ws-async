@@ -8,10 +8,10 @@ module.exports = (raw, wsc) => {
         to: parsed.to,
         type: parsed.type,
         content: parsed.content,
+        outgoing: false,
     });
 
     message._raw = raw;
-    message._outgoing = false;
 
     // prevent spoofing
     message._message.from = wsc.uuid;
