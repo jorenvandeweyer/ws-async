@@ -136,7 +136,7 @@ module.exports = class WebSocketMessage {
 
         this._state = STATES.RESOLVED;
 
-        content = content !== undefined ? content : this;
+        content = (content === undefined) ? this : content;
 
         if (content instanceof WebSocketMessage) {
             content = content.content;
@@ -172,7 +172,7 @@ module.exports = class WebSocketMessage {
             this._state = STATES.REJECTED;
         }
 
-        content = content || this;
+        content = (content === undefined) ? this : content;
 
         if (content instanceof WebSocketMessage) {
             content = content.content;
